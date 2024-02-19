@@ -32,10 +32,12 @@
 # For example:
 #
 # ```zsh
-# function zvm_config() {
-#   ZVM_LINE_INIT_MODE=$ZVM_MODE_INSERT
-#   ZVM_VI_INSERT_ESCAPE_BINDKEY=jk
-# }
+function zvm_config() {
+  ZVM_LINE_INIT_MODE=$ZVM_MODE_INSERT
+  ZVM_VI_INSERT_ESCAPE_BINDKEY=jk
+  ZVM_INSERT_MODE_CURSOR=$ZVM_CURSOR_BLINKING_BLOCK
+  ZVM_VI_HIGHLIGHT_BACKGROUND=yellow
+}
 #
 # source ~/zsh-vi-mode.zsh
 # ```
@@ -231,7 +233,7 @@ ZVM_INIT_DONE=false
 ZVM_POSTPONE_RESET_PROMPT=-1
 
 # Disable reset prompt (i.e. postpone the widget `reset-prompt`)
-ZVM_RESET_PROMPT_DISABLED=false
+ZVM_RESET_PROMPT_DISABLED=true
 
 # Operator pending mode
 ZVM_OPPEND_MODE=false
@@ -3790,8 +3792,8 @@ function zvm_init() {
   zvm_bindkey vicmd '^[[3~' delete-char
 
   # History search
-  zvm_bindkey viins '^R' history-incremental-search-backward
-  zvm_bindkey viins '^S' history-incremental-search-forward
+  # zvm_bindkey viins '^R' history-incremental-search-backward
+  # zvm_bindkey viins '^S' history-incremental-search-forward
   zvm_bindkey viins '^P' up-line-or-history
   zvm_bindkey viins '^N' down-line-or-history
 
@@ -4037,3 +4039,11 @@ case $ZVM_INIT_MODE in
   *) precmd_functions+=(zvm_init);;
 esac
 
+
+# navigate completions with hjkl
+zmodload zsh/complist
+bindkey -M menuselect 'h' vi-backward-char
+bindkey -M menuselect 'k' vi-up-line-or-history
+bindkey -M menuselect 'j' vi-down-line-or-history
+bindkey -M menuselect 'l' vi-forward-char
+bindkey -M menuselect 'o' accept-and-infer-next-history
