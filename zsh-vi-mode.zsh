@@ -408,6 +408,12 @@ function zvm_version() {
   echo -e "$ZVM_DESCRIPTION"
 }
 
+# Global cache for widget lookups
+typeset -gA ZVM_WIDGET_CACHE
+
+# Global registry for wrapped functions
+typeset -gA ZVM_WIDGET_WRAPPER_REGISTRY
+
 # The widget wrapper
 function zvm_widget_wrapper() {
   local rawfunc=$1;
@@ -423,22 +429,35 @@ function zvm_widget_wrapper() {
   return $retval
 }
 
+# Helper to mark functions that handle raw function calls
+function zvm_mark_wrapped() {
+  local func=$1
+  ZVM_WIDGET_WRAPPER_REGISTRY[$func]=true
+}
+
 # Define widget function
 function zvm_define_widget() {
   local widget=$1
-  local func=$2 || $1
-  local result=($(zle -l -L "${widget}"))
-
+  local func=${2:-$1}
+  
+  # Check cache first
+  local result
+  if [[ -z ${ZVM_WIDGET_CACHE[$widget]+x} ]]; then
+    result=($(zle -l -L "${widget}" 2>/dev/null))
+    ZVM_WIDGET_CACHE[$widget]="${#result[@]}:${result[4]:-}"
+  else
+    local cached=(${(s/:/)ZVM_WIDGET_CACHE[$widget]})
+    result=("" "" "" "${cached[2]}")
+    [[ ${cached[1]} == 4 ]] || result=()
+  fi
+  
   # Check if existing the same name
   if [[ ${#result[@]} == 4 ]]; then
     local rawfunc=${result[4]}
     local wrapper="zvm_${widget}-wrapper"
 
-    # To avoid double calling, we need to check if the raw function
-    # has been called already in the custom widget function
-    local rawcode=$(declare -f $func 2>/dev/null)
-    local called=false
-    [[ "$rawcode" == *"\$rawfunc"* ]] && { called=true }
+    # Check registry instead of introspection
+    local called=${ZVM_WIDGET_WRAPPER_REGISTRY[$func]:-false}
 
     eval "$wrapper() { zvm_widget_wrapper $rawfunc $func $called \"\$@\" }"
     func=$wrapper
@@ -3692,6 +3711,13 @@ function zvm_init() {
   # Mark plugin initial status
   ZVM_INIT_DONE=true
 
+  # Clear widget cache and wrapper registry on init
+  ZVM_WIDGET_CACHE=()
+  ZVM_WIDGET_WRAPPER_REGISTRY=()
+
+  # Mark functions that call $rawfunc
+  zvm_mark_wrapped zvm_reset_prompt
+
   zvm_exec_commands 'before_init'
 
   # Correct the readkey engine
@@ -4047,3 +4073,9 @@ bindkey -M menuselect 'k' vi-up-line-or-history
 bindkey -M menuselect 'j' vi-down-line-or-history
 bindkey -M menuselect 'l' vi-forward-char
 bindkey -M menuselect 'o' accept-and-infer-next-history
+
+# Cleanup function for plugin managers
+function zvm_cleanup() {
+  unset ZVM_WIDGET_CACHE
+  unset ZVM_WIDGET_WRAPPER_REGISTRY
+}
